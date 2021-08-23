@@ -1,0 +1,63 @@
+**Spring的线程池**
+
+使用@Async注解进行异步调用
+
+1.在Spring Boot的主程序中配置@EnableAsync注解
+
+2.创建ThreadExecutorConfig线程池配置
+
+```
+/**
+ * 配置线程池
+ * ThredPoolTaskExcutor的处理流程：当池子大小小于corePoolSize，就新建线程，并处理请求
+ *                当池子大小等于corePoolSize，把请求放入workQueue中，池子里的空闲线程就去workQueue中取任务并处理
+ *                当workQueue放不下任务时，就新建线程入池，并处理请求，如果池子大小撑到了maximumPoolSize，就用RejectedExecutionHandler来做拒绝处理
+ *                当池子的线程数大于corePoolSize时，多余的线程会等待keepAliveTime长时间，如果无请求可处理就自行销毁
+ *                其会优先创建  CorePoolSiz 线程， 当继续增加线程时，先放入Queue中，当 CorePoolSiz  和 Queue 都满的时候，就增加创建新线程，当线程达到MaxPoolSize的时候，就会抛出错
+ *               另外MaxPoolSize的设定如果比系统支持的线程数还要大时，会抛出java.lang.OutOfMemoryError: unable to create new native thread 异常。
+ * @return
+ */
+@Bean("线程池名字")
+public Executor taskExecutor() {
+    ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
+    // 线程池维护线程的最少数量
+    taskExecutor.setCorePoolSize(5);
+    // 线程池维护线程的最大数量
+    taskExecutor.setMaxPoolSize(10);
+    // 缓存队列
+    taskExecutor.setQueueCapacity(10);
+    taskExecutor.setThreadNamePrefix("threadPool");
+    // 设置拒绝策略
+    taskExecutor.setRejectedExecutionHandler(new RejectedExecutionHandler() {
+        @Override
+        public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+            System.out.println("do somethings by myself ...");
+            log.info("do somethings by myself ...");
+        }
+    });
+    taskExecutor.initialize();
+    return taskExecutor;
+}
+```
+
+
+
+3.在需要调用的方法上面添加
+
+```
+@Async("配置的线程池名字")
+```
+
+
+
+
+
+## **注意事项**
+
+如下方式会使@Async失效
+
+- 异步方法使用static修饰
+- 异步类没有使用@Component注解（或其他注解）导致spring无法扫描到异步类
+- 异步方法不能与被调用的异步方法在同一个类中
+- 类中需要使用@Autowired或@Resource等注解自动注入，不能自己手动new对象
+- 如果使用SpringBoot框架必须在启动类中增加@EnableAsync注解
